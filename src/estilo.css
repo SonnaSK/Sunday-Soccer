@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* Campo à noite: base verde-escura, linhas de cal como divisores,
+   dourado como acento único. Paleta do 03-DESENVOLVIMENTO.md. */
+@theme {
+  --color-pitch: #0d1a15; /* fundo */
+  --color-surface: #15251e; /* cartões */
+  --color-surface2: #1d3229; /* campos */
+  --color-chalk: #edebe3; /* texto */
+  --color-muted: #7e9189; /* texto secundário */
+  --color-line: rgba(237, 235, 227, 0.13);
+  --color-gold: #d9a441; /* ação primária, destaque */
+  --color-alert: #c9634b; /* placar estourado */
+
+  --font-sans: "Barlow", ui-sans-serif, system-ui, sans-serif;
+  --font-condensed: "Barlow Condensed", "Barlow", ui-sans-serif, sans-serif;
+}
+
+html {
+  background: var(--color-pitch);
+}
+
+body {
+  margin: 0;
+  background: var(--color-pitch);
+  color: var(--color-chalk);
+  font-family: var(--font-sans);
+  /* O app é usado no celular; respeita entalhe e barra inferior. */
+  padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+}
+
+/* Sem isto as colunas de ranking dançam a cada dígito. */
+.tabular,
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
