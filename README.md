@@ -4,13 +4,13 @@ App para registrar os jogos semanais de um horário de futebol society e acompan
 
 Um administrador lança o resultado de domingo — colando o texto da súmula ou preenchendo campo a campo — e o grupo inteiro acessa os rankings por um link, sem login.
 
-## Como instalar estes arquivos no projeto
+## Estrutura
 
 ```
 domingo/
-├── CLAUDE.md                  ← raiz do projeto
+├── CLAUDE.md                  instruções do projeto para o Claude Code
+├── README.md                  este arquivo
 ├── docs/
-│   ├── README.md              ← este arquivo
 │   ├── 01-PRODUTO.md
 │   ├── 02-MODELO-DADOS.md
 │   ├── 03-DESENVOLVIMENTO.md
@@ -25,16 +25,16 @@ domingo/
         └── dados.ts
 ```
 
-O `CLAUDE.md` vai na **raiz**, não em `docs/` — é lá que o Claude Code procura.
+O `CLAUDE.md` fica na **raiz**, não em `docs/` — é lá que o Claude Code procura.
 
 ## Documentação
 
 | Documento | Para quê |
 |---|---|
-| [01-PRODUTO.md](01-PRODUTO.md) | O que o app é, para quem, telas, regras de negócio, decisões e roadmap |
-| [02-MODELO-DADOS.md](02-MODELO-DADOS.md) | Esquema do banco, decisões de modelagem e as queries de estatística |
-| [03-DESENVOLVIMENTO.md](03-DESENVOLVIMENTO.md) | Stack, ambiente, Supabase, estrutura, paleta, deploy |
-| [04-MANUAL.md](04-MANUAL.md) | Como usar, para o administrador e para o grupo |
+| [01-PRODUTO.md](docs/01-PRODUTO.md) | O que o app é, para quem, telas, regras de negócio, decisões e roadmap |
+| [02-MODELO-DADOS.md](docs/02-MODELO-DADOS.md) | Esquema do banco, decisões de modelagem e as queries de estatística |
+| [03-DESENVOLVIMENTO.md](docs/03-DESENVOLVIMENTO.md) | Stack, ambiente, Supabase, estrutura, paleta, deploy |
+| [04-MANUAL.md](docs/04-MANUAL.md) | Como usar, para o administrador e para o grupo |
 
 ## SQL
 
@@ -42,9 +42,9 @@ Todos testados em PostgreSQL 16 e já aplicados no projeto Supabase.
 
 | Arquivo | Quando |
 |---|---|
-| [schema.sql](schema.sql) | Migração inicial: tabelas, índices, gatilhos, views, RLS e grants |
-| [rpc-salvar-rodada.sql](rpc-salvar-rodada.sql) | Função transacional que grava rodada, partida e escalação de uma vez |
-| [seed-rodada.sql](seed-rodada.sql) | Primeira rodada real, com consultas de conferência |
+| [schema.sql](docs/schema.sql) | Migração inicial: tabelas, índices, gatilhos, views, RLS e grants |
+| [rpc-salvar-rodada.sql](docs/rpc-salvar-rodada.sql) | Função transacional que grava rodada, partida e escalação de uma vez |
+| [seed-rodada.sql](docs/seed-rodada.sql) | Primeira rodada real, com consultas de conferência |
 
 ## Estado
 
