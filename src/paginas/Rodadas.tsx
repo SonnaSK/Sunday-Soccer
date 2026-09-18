@@ -14,7 +14,13 @@ import type { RodadaDetalhada } from "../lib/tipos";
  * aproveitamento, goleiros e fichas — sem que o dado seja destruído.
  * É o que permite desfazer um arquivamento feito por engano.
  */
-export default function Rodadas({ admin }: { admin: boolean }) {
+export default function Rodadas({
+  admin,
+  aoEditar,
+}: {
+  admin: boolean;
+  aoEditar: (id: string) => void;
+}) {
   const [rodadas, setRodadas] = useState<RodadaDetalhada[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -93,17 +99,27 @@ export default function Rodadas({ admin }: { admin: boolean }) {
               </div>
 
               {admin && (
-                <button
-                  onClick={() => void alternar(rodada.id, rodada.ativo)}
-                  disabled={ocupado === rodada.id}
-                  className={`shrink-0 rounded border px-3 py-1.5 text-sm disabled:opacity-40 ${
-                    rodada.ativo
-                      ? "border-alert text-alert"
-                      : "border-line text-muted"
-                  }`}
-                >
-                  {rodada.ativo ? "Arquivar" : "Restaurar"}
-                </button>
+                <div className="flex shrink-0 gap-2">
+                  {rodada.ativo && (
+                    <button
+                      onClick={() => aoEditar(rodada.id)}
+                      className="border-line text-muted rounded border px-3 py-1.5 text-sm"
+                    >
+                      Editar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => void alternar(rodada.id, rodada.ativo)}
+                    disabled={ocupado === rodada.id}
+                    className={`rounded border px-3 py-1.5 text-sm disabled:opacity-40 ${
+                      rodada.ativo
+                        ? "border-alert text-alert"
+                        : "border-line text-muted"
+                    }`}
+                  >
+                    {rodada.ativo ? "Arquivar" : "Restaurar"}
+                  </button>
+                </div>
               )}
             </div>
 

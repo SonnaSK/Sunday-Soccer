@@ -3,6 +3,7 @@ import { usuarioAtual, ehAdministrador, sair } from "./lib/dados";
 import Elenco from "./paginas/Elenco";
 import Entrar from "./paginas/Entrar";
 import Rodadas from "./paginas/Rodadas";
+import Lancar from "./paginas/Lancar";
 
 type Sessao = {
   logado: boolean;
@@ -10,12 +11,14 @@ type Sessao = {
   email: string | null;
 };
 
-type Aba = "elenco" | "rodadas";
+type Aba = "elenco" | "rodadas" | "lançar";
 
 export default function App() {
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [mostrarLogin, setMostrarLogin] = useState(false);
   const [aba, setAba] = useState<Aba>("elenco");
+  // Presente = Lançar abre em modo edição daquela rodada.
+  const [editando, setEditando] = useState<string | null>(null);
 
   const conferir = useCallback(async () => {
     const usuario = await usuarioAtual();
@@ -92,10 +95,16 @@ export default function App() {
       )}
 
       <nav className="mb-6 flex gap-2">
-        {(["elenco", "rodadas"] as const).map((a) => (
+        {(admin
+          ? (["elenco", "rodadas", "lançar"] as const)
+          : (["elenco", "rodadas"] as const)
+        ).map((a) => (
           <button
             key={a}
-            onClick={() => setAba(a)}
+            onClick={() => {
+              setEditando(null);
+              setAba(a);
+            }}
             className={`font-condensed rounded px-4 py-1.5 tracking-wide uppercase ${
               aba === a
                 ? "bg-gold text-pitch font-semibold"
@@ -107,7 +116,34 @@ export default function App() {
         ))}
       </nav>
 
-      {aba === "elenco" ? <Elenco admin={admin} /> : <Rodadas admin={admin} />}
+      {aba === "elenco" && <Elenco admin={admin} />}
+
+      {aba === "rodadas" && (
+        <Rodadas
+          admin={admin}
+          aoEditar={(id) => {
+            setEditando(id);
+            setAba("lançar");
+          }}
+        />
+      )}
+
+      {aba === "lançar" && admin && (
+        <Lancar
+          // Remonta a tela ao trocar de rodada, em vez de reaproveitar o
+          // formulário já preenchido com outra.
+          key={editando ?? "nova"}
+          rodadaId={editando ?? undefined}
+          aoSalvar={() => {
+            setEditando(null);
+            setAba("rodadas");
+          }}
+          aoCancelar={() => {
+            setEditando(null);
+            setAba("rodadas");
+          }}
+        />
+      )}
 
       {sessao && !sessao.logado && (
         <p className="text-muted mt-10 text-sm">
