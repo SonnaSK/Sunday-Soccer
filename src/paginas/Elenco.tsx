@@ -244,7 +244,7 @@ function FormUniforme({
 
       <Texto rotulo="Nome" valor={nome} aoMudar={setNome} />
 
-      <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-wrap items-start gap-4">
         <Cor rotulo="Primária" valor={primaria} aoMudar={setPrimaria} />
         <Cor rotulo="Secundária" valor={secundaria} aoMudar={setSecundaria} />
         <label className="block">
@@ -660,7 +660,23 @@ function Texto({
 }
 
 /**
- * Cor por seletor OU por código digitado.
+ * Dezesseis cores de camisa, em quatro faixas: neutros, quentes, frios e
+ * verdes com roxos. Cobre o que um horário de society usa na prática, e
+ * inclui os tons dos uniformes atuais — o azul e o amarelo do Boca, o
+ * azul-claro do Racing — para reencontrá-los num toque.
+ *
+ * Atalho, não limite: o seletor e o campo de código continuam ali para
+ * qualquer cor fora desta lista.
+ */
+const PALETA: Array<[string, string]> = [
+  ["#edebe3", "Branco"],    ["#9aa3a8", "Cinza"],      ["#3a4046", "Grafite"],   ["#17191c", "Preto"],
+  ["#c62828", "Vermelho"],  ["#e2711d", "Laranja"],    ["#f2c230", "Amarelo"],   ["#d9a441", "Dourado"],
+  ["#0b2a6b", "Marinho"],   ["#1e5aa8", "Azul"],       ["#79aedc", "Azul-claro"],["#0e8f86", "Turquesa"],
+  ["#1e7a3c", "Verde"],     ["#7bb13c", "Verde-limão"],["#6b3fa0", "Roxo"],      ["#7e1f3a", "Vinho"],
+];
+
+/**
+ * Cor por paleta, por seletor OU por código digitado.
  *
  * O seletor do sistema é desconfortável no celular e não permite repetir
  * uma cor exata. O campo de texto resolve os dois casos: dá para colar o
@@ -688,9 +704,31 @@ function Cor({
     if (/^#[0-9a-f]{6}$/i.test(hex)) aoMudar(hex.toLowerCase());
   }
 
+  const atual = valor.toLowerCase();
+
   return (
     <div>
       <span className="text-muted mb-1 block text-sm">{rotulo}</span>
+
+      <div className="mb-2 grid w-[9.5rem] grid-cols-4 gap-1.5">
+        {PALETA.map(([hex, nome]) => (
+          <button
+            key={hex}
+            type="button"
+            onClick={() => aoMudar(hex)}
+            title={nome}
+            aria-label={`${rotulo}: ${nome}`}
+            aria-pressed={atual === hex}
+            className={`h-8 w-8 rounded border transition-[box-shadow] ${
+              atual === hex
+                ? "border-gold ring-gold ring-2 ring-offset-1 ring-offset-transparent"
+                : "border-line"
+            }`}
+            style={{ background: hex }}
+          />
+        ))}
+      </div>
+
       <div className="flex items-center gap-2">
         <input
           type="color"
@@ -708,7 +746,7 @@ function Cor({
           autoCapitalize="none"
           placeholder="#0B2A6B"
           aria-label={`${rotulo}: código`}
-          className="bg-surface2 border-line text-chalk tabular w-28 rounded border px-2 py-2 font-mono text-sm"
+          className="bg-surface2 border-line text-chalk tabular w-24 rounded border px-2 py-2 font-mono text-sm"
         />
       </div>
     </div>
