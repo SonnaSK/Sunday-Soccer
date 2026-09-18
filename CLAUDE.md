@@ -16,14 +16,37 @@ Interface e comentários em **português do Brasil**.
 | `docs/rpc-salvar-rodada.sql` | Função transacional, já aplicada |
 | `src/lib/tipos.ts` | Tipos espelhando o schema |
 | `src/lib/dados.ts` | Camada única de acesso ao banco |
+| `src/paginas/` | As telas: Elenco, Rodadas, Lancar, Entrar |
+| `docs/limpar-dados.sql` | Manutenção: apaga rodadas e jogadores. `DELETE` sem volta, nunca executado |
 
 Ao encontrar um caso que a especificação não previu, leia a seção de Decisões do `01-PRODUTO.md` antes de escolher. O raciocínio está lá justamente para que as decisões novas apontem na mesma direção das antigas.
 
 ## Estado
 
-Banco criado e populado no Supabase, com uma rodada real dentro (Boca 10 x 7 Racing, 07/09). `src/lib/` pronto. Nenhuma tela construída ainda.
+Atualizado em 17/09/2026.
 
-Próximo passo: tela de Elenco. Depois Lançar em modo preencher, depois Estatísticas. A ordem está no fim do `03-DESENVOLVIMENTO.md` e não é arbitrária — Elenco é o loop completo mais simples de ler e escrever, e serve para descobrir problemas de configuração numa tela onde erro é barato.
+**Banco.** Supabase no ar, com `schema.sql`, `rpc-salvar-rodada.sql` e `seed-rodada.sql` aplicados. Dentro: 1 horário, 3 uniformes (Boca, Racing, Inter), 14 jogadores, e a rodada real Boca 10 x 7 Racing de 07/09 com as 12 escalações. Administrador registrado — login de escrita funcionando.
+
+**App.** Projeto Vite rodando (React 19, TypeScript 7, Tailwind 4). Três telas prontas:
+
+| Tela | O que faz |
+|---|---|
+| `paginas/Elenco.tsx` | Uniformes com paleta de 16 cores, código hex e ciclo em uso/aposentado. Jogadores com criar, editar, desativar e excluir |
+| `paginas/Rodadas.tsx` | Lista com placar e cores, arquivar, restaurar e abrir para edição |
+| `paginas/Lancar.tsx` | Modo preencher, com a trava do placar. Cria rodada nova e edita existente |
+| `paginas/Entrar.tsx` | Login do administrador |
+
+**Marco atingido:** Lançar funciona. A planilha pode ser aposentada assim que o primeiro domingo for lançado por ela.
+
+**Próximo passo: Estatísticas**, com os cinco rankings do `01-PRODUTO.md` — artilharia, assistências, aproveitamento com mínimo de amostra, presença e goleiros. As views `v_participacao`, `v_goleiro` e `v_partida` já entregam tudo mastigado.
+
+**Depois, deploy — e ele subiu de prioridade.** O `03-DESENVOLVIMENTO.md` o coloca em oitavo, mas hoje o app só existe em `localhost` e no IP da rede local. Lançar é usado no celular, no domingo à noite, o que hoje exige o PC ligado e estar dentro de casa. Publicar resolve isso e entrega o link do grupo de uma vez.
+
+### Desvios da ordem original, e por quê
+
+**Login veio no passo 2, não no 5.** O grant dá `select` ao papel `anon` e nada mais, então toda escrita exige sessão. Sem login, Elenco seria uma tela de leitura e o passo não ficaria utilizável — que é a regra do próprio `03-DESENVOLVIMENTO.md`.
+
+**Rodadas e edição vieram antes de Estatísticas**, a pedido do usuário, para poder corrigir e arquivar dado lançado.
 
 ## Regras não negociáveis
 

@@ -48,20 +48,35 @@ Todos testados em PostgreSQL 16 e já aplicados no projeto Supabase.
 
 ## Estado
 
-Banco criado e populado, com uma rodada real dentro. `src/lib/` pronto. Nenhuma tela construída.
+Atualizado em 17/09/2026.
 
-Próximo: tela de Elenco, depois Lançar, depois Estatísticas. A ordem está no fim do `03-DESENVOLVIMENTO.md`.
+Banco no ar no Supabase, com 3 uniformes, 14 jogadores e a rodada Boca 10 x 7 Racing de 07/09. Administrador registrado.
 
-## Teste rápido antes da primeira tela
+Três telas prontas: **Elenco** (uniformes e jogadores, com criar, editar e excluir), **Rodadas** (arquivar, restaurar e editar) e **Lançar** em modo preencher, com a trava do placar. Mais o login do administrador.
 
-Com `.env.local` preenchido, coloque num componente:
+O marco foi atingido: **Lançar funciona**, então a planilha pode ser aposentada.
 
-```ts
-import { listarJogadores } from "./lib/dados";
-listarJogadores().then(console.log);
+Próximo: **Estatísticas**, com os cinco rankings. Depois **deploy** — que subiu de prioridade, porque hoje o app só roda na máquina do administrador.
+
+## Como rodar
+
+Precisa de Node 20 ou superior e do `.env.local` preenchido:
+
+```
+VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_...
 ```
 
-Se os jogadores aparecerem no console, a corrente inteira está funcionando: chave, grants, RLS e camada de dados. Se falhar, é uma linha para depurar em vez de uma tela.
+Então, na pasta do projeto:
+
+```bash
+npm install     # só na primeira vez
+npm run dev
+```
+
+Ele imprime dois endereços. O `Local` abre no próprio PC; o `Network` é o IP da máquina na rede e serve para abrir no celular, **desde que esteja no mesmo wi-fi**. O servidor vive enquanto o comando estiver rodando — fechou o terminal, acabou. Enquanto não houver deploy, é assim que o app existe.
+
+O banco não depende disso: ele está no Supabase e continua no ar de qualquer jeito.
 
 ## Princípio que orienta o projeto
 
