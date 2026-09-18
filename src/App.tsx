@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usuarioAtual, ehAdministrador, sair } from "./lib/dados";
 import Elenco from "./paginas/Elenco";
 import Entrar from "./paginas/Entrar";
+import Rodadas from "./paginas/Rodadas";
 
 type Sessao = {
   logado: boolean;
@@ -9,9 +10,12 @@ type Sessao = {
   email: string | null;
 };
 
+type Aba = "elenco" | "rodadas";
+
 export default function App() {
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [mostrarLogin, setMostrarLogin] = useState(false);
+  const [aba, setAba] = useState<Aba>("elenco");
 
   const conferir = useCallback(async () => {
     const usuario = await usuarioAtual();
@@ -87,7 +91,23 @@ export default function App() {
         </div>
       )}
 
-      <Elenco admin={admin} />
+      <nav className="mb-6 flex gap-2">
+        {(["elenco", "rodadas"] as const).map((a) => (
+          <button
+            key={a}
+            onClick={() => setAba(a)}
+            className={`font-condensed rounded px-4 py-1.5 tracking-wide uppercase ${
+              aba === a
+                ? "bg-gold text-pitch font-semibold"
+                : "border-line text-muted border"
+            }`}
+          >
+            {a}
+          </button>
+        ))}
+      </nav>
+
+      {aba === "elenco" ? <Elenco admin={admin} /> : <Rodadas admin={admin} />}
 
       {sessao && !sessao.logado && (
         <p className="text-muted mt-10 text-sm">

@@ -8,6 +8,7 @@ import { supabase } from "./supabase";
 import type {
   Jogador, Uniforme, Rodada, Partida, Escalacao,
   Participacao, GoleiroPartida, FichaPartida, RodadaParaSalvar,
+  RodadaDetalhada,
 } from "./tipos";
 
 function erro(contexto: string, e: unknown): never {
@@ -76,6 +77,40 @@ export async function atualizarJogador(id: string, campos: Partial<Jogador>) {
   if (error) erro("atualizarJogador", error);
 }
 
+/**
+ * Apaga de verdade. Só use em jogador que nunca entrou em partida — o
+ * banco recusa o resto, porque escalacao aponta para ele. Para quem tem
+ * histórico, o caminho é `atualizarJogador(id, { ativo: false })`.
+ */
+export async function excluirJogador(id: string) {
+  const { error } = await supabase.from("jogador").delete().eq("id", id);
+  if (error) erro("excluirJogador", error);
+}
+
+/**
+ * Quem já apareceu em alguma partida, como jogador de linha ou no gol.
+ * Lê escalacao e partida direto, e não as views, porque estas escondem
+ * rodada arquivada — e histórico arquivado ainda impede exclusão.
+ */
+export async function idsDeJogadoresComHistorico(): Promise<Set<string>> {
+  const [esc, par] = await Promise.all([
+    supabase.from("escalacao").select("jogador_id"),
+    supabase.from("partida").select("goleiro_casa_id, goleiro_fora_id"),
+  ]);
+  if (esc.error) erro("idsDeJogadoresComHistorico", esc.error);
+  if (par.error) erro("idsDeJogadoresComHistorico", par.error);
+
+  const ids = new Set<string>();
+  for (const e of esc.data as Array<{ jogador_id: string }>) ids.add(e.jogador_id);
+  for (const p of par.data as Array<{
+    goleiro_casa_id: string | null; goleiro_fora_id: string | null;
+  }>) {
+    if (p.goleiro_casa_id) ids.add(p.goleiro_casa_id);
+    if (p.goleiro_fora_id) ids.add(p.goleiro_fora_id);
+  }
+  return ids;
+}
+
 /* ---------------------------------------------------------------- */
 /*  Uniformes                                                       */
 /* ---------------------------------------------------------------- */
@@ -98,6 +133,11 @@ export async function criarUniforme(u: {
     .select().single();
   if (error) erro("criarUniforme", error);
   return data as Uniforme;
+}
+
+export async function atualizarUniforme(id: string, campos: Partial<Uniforme>) {
+  const { error } = await supabase.from("uniforme").update(campos).eq("id", id);
+  if (error) erro("atualizarUniforme", error);
 }
 
 /** Aposenta ou reativa. Nunca apague um uniforme: partidas antigas apontam para ele. */
@@ -142,10 +182,54 @@ export async function salvarRodada(r: RodadaParaSalvar): Promise<string> {
   return data as string;
 }
 
-/** Exclusão lógica. Nunca DELETE. */
+/**
+ * Rodadas com partidas e uniformes resolvidos, para a tela de gerenciamento.
+ *
+ * As partidas vêm aninhadas, mas os uniformes são casados aqui em memória
+ * em vez de por join aninhado: `partida` aponta duas vezes para `uniforme`,
+ * e desambiguar isso no PostgREST exige citar o nome da constraint de
+ * chave estrangeira — detalhe frágil, e são três linhas de uniforme.
+ */
+export async function listarRodadasDetalhadas(
+  incluirArquivadas = false
+): Promise<RodadaDetalhada[]> {
+  let q = supabase
+    .from("rodada").select("*, partida(*)").order("data", { ascending: false });
+  if (!incluirArquivadas) q = q.eq("ativo", true);
+
+  const { data, error } = await q;
+  if (error) erro("listarRodadasDetalhadas", error);
+
+  const porId = new Map((await listarUniformes()).map((u) => [u.id, u]));
+
+  return (data as Array<Rodada & { partida: Partida[] }>).map(
+    ({ partida, ...rodada }) => ({
+      rodada,
+      partidas: [...(partida ?? [])]
+        .sort((a, b) => a.ordem - b.ordem)
+        .map((p) => ({
+          partida: p,
+          uniforme_casa: porId.get(p.uniforme_casa_id) ?? null,
+          uniforme_fora: porId.get(p.uniforme_fora_id) ?? null,
+        })),
+    })
+  );
+}
+
+/**
+ * Exclusão lógica. Nunca DELETE — as três views filtram `where r.ativo`,
+ * então arquivar já tira a rodada de toda estatística, e o dado continua
+ * lá para ser restaurado.
+ */
 export async function arquivarRodada(id: string) {
   const { error } = await supabase.from("rodada").update({ ativo: false }).eq("id", id);
   if (error) erro("arquivarRodada", error);
+}
+
+/** Desfaz o arquivamento. */
+export async function restaurarRodada(id: string) {
+  const { error } = await supabase.from("rodada").update({ ativo: true }).eq("id", id);
+  if (error) erro("restaurarRodada", error);
 }
 
 /* ---------------------------------------------------------------- */

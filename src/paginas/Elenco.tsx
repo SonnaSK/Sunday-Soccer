@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   listarJogadores,
   listarUniformes,
   criarJogador,
   criarUniforme,
+  atualizarJogador,
+  atualizarUniforme,
   alternarUniforme,
+  excluirJogador,
+  idsDeJogadoresComHistorico,
 } from "../lib/dados";
 import type { Jogador, Uniforme, TipoJogador, Vinculo } from "../lib/tipos";
 
@@ -13,27 +17,34 @@ import type { Jogador, Uniforme, TipoJogador, Vinculo } from "../lib/tipos";
  *
  * Lê em público — é o que permite mandar o link no grupo. Escreve só com
  * `admin`, porque o RLS restringe insert e update a quem está na tabela
- * `administrador`. Sem login os formulários nem aparecem, em vez de
+ * `administrador`. Sem login os controles nem aparecem, em vez de
  * aparecerem e falharem no envio.
  */
 export default function Elenco({ admin }: { admin: boolean }) {
   const [jogadores, setJogadores] = useState<Jogador[] | null>(null);
   const [uniformes, setUniformes] = useState<Uniforme[] | null>(null);
+  const [comHistorico, setComHistorico] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState<string | null>(null);
 
-  async function carregar() {
+  // Administrador enxerga inativos, para poder reativar. O grupo não.
+  const carregar = useCallback(async () => {
     try {
-      const [j, u] = await Promise.all([listarJogadores(), listarUniformes()]);
+      const [j, u, h] = await Promise.all([
+        listarJogadores(admin),
+        listarUniformes(),
+        admin ? idsDeJogadoresComHistorico() : Promise.resolve(new Set<string>()),
+      ]);
       setJogadores(j);
       setUniformes(u);
+      setComHistorico(h);
     } catch (x) {
       setErro(x instanceof Error ? x.message : String(x));
     }
-  }
+  }, [admin]);
 
   useEffect(() => {
     void carregar();
-  }, []);
+  }, [carregar]);
 
   if (erro) return <Aviso>{erro}</Aviso>;
   if (!jogadores || !uniformes)
@@ -48,6 +59,7 @@ export default function Elenco({ admin }: { admin: boolean }) {
       />
       <SecaoJogadores
         jogadores={jogadores}
+        comHistorico={comHistorico}
         admin={admin}
         aoMudar={() => void carregar()}
       />
@@ -68,65 +80,135 @@ function SecaoUniformes({
   admin: boolean;
   aoMudar: () => void;
 }) {
-  const [ocupado, setOcupado] = useState<string | null>(null);
+  const [editando, setEditando] = useState<string | null>(null);
+  const [criando, setCriando] = useState(false);
+
+  return (
+    <section>
+      <Titulo>
+        Uniformes <span className="tabular">({uniformes.length})</span>
+      </Titulo>
+
+      <ul className="divide-line divide-y">
+        {uniformes.map((u) =>
+          editando === u.id ? (
+            <li key={u.id} className="py-3">
+              <FormUniforme
+                inicial={u}
+                aoSalvar={() => {
+                  setEditando(null);
+                  aoMudar();
+                }}
+                aoCancelar={() => setEditando(null)}
+              />
+            </li>
+          ) : (
+            <LinhaUniforme
+              key={u.id}
+              uniforme={u}
+              admin={admin}
+              aoEditar={() => setEditando(u.id)}
+              aoMudar={aoMudar}
+            />
+          )
+        )}
+      </ul>
+
+      {admin &&
+        (criando ? (
+          <div className="mt-4">
+            <FormUniforme
+              aoSalvar={() => {
+                setCriando(false);
+                aoMudar();
+              }}
+              aoCancelar={() => setCriando(false)}
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => setCriando(true)}
+            className="border-line text-muted mt-4 rounded border border-dashed px-4 py-2 text-sm"
+          >
+            + Novo uniforme
+          </button>
+        ))}
+    </section>
+  );
+}
+
+function LinhaUniforme({
+  uniforme: u,
+  admin,
+  aoEditar,
+  aoMudar,
+}: {
+  uniforme: Uniforme;
+  admin: boolean;
+  aoEditar: () => void;
+  aoMudar: () => void;
+}) {
   const [erro, setErro] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
 
   // Aposentar nunca apaga: partidas antigas continuam apontando para ele.
-  async function alternar(u: Uniforme) {
+  async function alternar() {
     setErro(null);
-    setOcupado(u.id);
+    setOcupado(true);
     try {
       await alternarUniforme(u.id, !u.ativo);
       aoMudar();
     } catch (x) {
       setErro(x instanceof Error ? x.message : String(x));
     } finally {
-      setOcupado(null);
+      setOcupado(false);
     }
   }
 
   return (
-    <section>
-      <Titulo>Uniformes</Titulo>
-
+    <li className="py-3">
+      <div className="flex items-center gap-3">
+        <Amostra primaria={u.cor_primaria} secundaria={u.cor_secundaria} />
+        <div className="min-w-0 flex-1">
+          <p className={u.ativo ? "font-medium" : "text-muted font-medium"}>
+            {u.nome}
+          </p>
+          <p className="text-muted tabular text-sm">
+            {u.ano ?? "—"}
+            {!u.ativo && " · aposentado"}
+          </p>
+        </div>
+        {admin && (
+          <div className="flex shrink-0 gap-2">
+            <Acao onClick={aoEditar}>Editar</Acao>
+            <Acao onClick={() => void alternar()} disabled={ocupado}>
+              {u.ativo ? "Aposentar" : "Reativar"}
+            </Acao>
+          </div>
+        )}
+      </div>
       {erro && <Aviso>{erro}</Aviso>}
-
-      <ul className="divide-line divide-y">
-        {uniformes.map((u) => (
-          <li key={u.id} className="flex items-center gap-3 py-3">
-            <Amostra primaria={u.cor_primaria} secundaria={u.cor_secundaria} />
-            <div className="min-w-0 flex-1">
-              <p className={u.ativo ? "font-medium" : "text-muted font-medium"}>
-                {u.nome}
-              </p>
-              <p className="text-muted tabular text-sm">
-                {u.ano ?? "—"}
-                {!u.ativo && " · aposentado"}
-              </p>
-            </div>
-            {admin && (
-              <button
-                onClick={() => void alternar(u)}
-                disabled={ocupado === u.id}
-                className="border-line text-muted shrink-0 rounded border px-3 py-1.5 text-sm disabled:opacity-40"
-              >
-                {u.ativo ? "Aposentar" : "Reativar"}
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-
-      {admin && <FormUniforme aoCriar={aoMudar} />}
-    </section>
+    </li>
   );
 }
 
-function FormUniforme({ aoCriar }: { aoCriar: () => void }) {
-  const [nome, setNome] = useState("");
-  const [primaria, setPrimaria] = useState("#1E5AA8");
-  const [secundaria, setSecundaria] = useState("#EDEBE3");
-  const [ano, setAno] = useState(String(new Date().getFullYear()));
+function FormUniforme({
+  inicial,
+  aoSalvar,
+  aoCancelar,
+}: {
+  inicial?: Uniforme;
+  aoSalvar: () => void;
+  aoCancelar: () => void;
+}) {
+  const [nome, setNome] = useState(inicial?.nome ?? "");
+  const [primaria, setPrimaria] = useState(inicial?.cor_primaria ?? "#1E5AA8");
+  const [secundaria, setSecundaria] = useState(
+    inicial?.cor_secundaria ?? "#EDEBE3"
+  );
+  const [ano, setAno] = useState(
+    String(inicial?.ano ?? new Date().getFullYear())
+  );
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -134,15 +216,16 @@ function FormUniforme({ aoCriar }: { aoCriar: () => void }) {
     e.preventDefault();
     setErro(null);
     setEnviando(true);
+    const campos = {
+      nome: nome.trim(),
+      cor_primaria: primaria,
+      cor_secundaria: secundaria,
+      ano: Number(ano),
+    };
     try {
-      await criarUniforme({
-        nome: nome.trim(),
-        cor_primaria: primaria,
-        cor_secundaria: secundaria,
-        ano: Number(ano),
-      });
-      setNome("");
-      aoCriar();
+      if (inicial) await atualizarUniforme(inicial.id, campos);
+      else await criarUniforme(campos);
+      aoSalvar();
     } catch (x) {
       setErro(x instanceof Error ? x.message : String(x));
     } finally {
@@ -153,15 +236,17 @@ function FormUniforme({ aoCriar }: { aoCriar: () => void }) {
   return (
     <form
       onSubmit={enviar}
-      className="border-line bg-surface mt-4 space-y-3 rounded-lg border p-4"
+      className="border-line bg-surface space-y-3 rounded-lg border p-4"
     >
-      <p className="text-muted text-sm">Novo uniforme</p>
+      <p className="text-muted text-sm">
+        {inicial ? `Editando ${inicial.nome}` : "Novo uniforme"}
+      </p>
 
       <Texto rotulo="Nome" valor={nome} aoMudar={setNome} />
 
-      <div className="flex flex-wrap gap-4">
-        <Cor rotulo="Cor primária" valor={primaria} aoMudar={setPrimaria} />
-        <Cor rotulo="Cor secundária" valor={secundaria} aoMudar={setSecundaria} />
+      <div className="flex flex-wrap items-end gap-4">
+        <Cor rotulo="Primária" valor={primaria} aoMudar={setPrimaria} />
+        <Cor rotulo="Secundária" valor={secundaria} aoMudar={setSecundaria} />
         <label className="block">
           <span className="text-muted mb-1 block text-sm">Ano</span>
           <input
@@ -171,22 +256,20 @@ function FormUniforme({ aoCriar }: { aoCriar: () => void }) {
             className="bg-surface2 border-line text-chalk tabular w-24 rounded border px-3 py-2"
           />
         </label>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <span className="text-muted text-sm">Prévia:</span>
-        <Amostra primaria={primaria} secundaria={secundaria} />
+        <div className="flex items-center gap-2 pb-2">
+          <span className="text-muted text-sm">Prévia:</span>
+          <Amostra primaria={primaria} secundaria={secundaria} />
+        </div>
       </div>
 
       {erro && <p className="text-alert text-sm">{erro}</p>}
 
-      <button
-        type="submit"
-        disabled={enviando || !nome.trim()}
-        className="bg-gold text-pitch rounded px-4 py-2 font-semibold disabled:opacity-40"
-      >
-        {enviando ? "Salvando…" : "Criar uniforme"}
-      </button>
+      <Botoes
+        enviando={enviando}
+        desabilitado={!nome.trim()}
+        rotulo={inicial ? "Salvar" : "Criar uniforme"}
+        aoCancelar={aoCancelar}
+      />
     </form>
   );
 }
@@ -217,57 +300,184 @@ const VINCULOS: Vinculo[] = ["mensalista", "suplente", "contratado", "espera"];
 
 function SecaoJogadores({
   jogadores,
+  comHistorico,
   admin,
   aoMudar,
 }: {
   jogadores: Jogador[];
+  comHistorico: Set<string>;
   admin: boolean;
   aoMudar: () => void;
 }) {
+  const [editando, setEditando] = useState<string | null>(null);
+  const [criando, setCriando] = useState(false);
+  const ativos = jogadores.filter((j) => j.ativo).length;
+
   return (
     <section>
       <Titulo>
-        Jogadores <span className="tabular">({jogadores.length})</span>
+        Jogadores <span className="tabular">({ativos})</span>
       </Titulo>
 
       <ul className="divide-line divide-y">
-        {jogadores.map((j) => (
-          <li key={j.id} className="flex items-baseline gap-3 py-3">
-            <div className="min-w-0 flex-1">
-              <p className="font-medium">
-                {j.apelido}
-                {j.tipo === "goleiro" && (
-                  <span className="text-gold ml-2 text-xs uppercase">
-                    goleiro
-                  </span>
-                )}
-              </p>
-              {(j.nome_completo || j.posicao_preferida) && (
-                <p className="text-muted truncate text-sm">
-                  {[j.nome_completo, j.posicao_preferida]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              )}
-            </div>
-            <span className="text-muted shrink-0 text-xs uppercase">
-              {j.vinculo}
-            </span>
-          </li>
-        ))}
+        {jogadores.map((j) =>
+          editando === j.id ? (
+            <li key={j.id} className="py-3">
+              <FormJogador
+                inicial={j}
+                aoSalvar={() => {
+                  setEditando(null);
+                  aoMudar();
+                }}
+                aoCancelar={() => setEditando(null)}
+              />
+            </li>
+          ) : (
+            <LinhaJogador
+              key={j.id}
+              jogador={j}
+              admin={admin}
+              temHistorico={comHistorico.has(j.id)}
+              aoEditar={() => setEditando(j.id)}
+              aoMudar={aoMudar}
+            />
+          )
+        )}
       </ul>
 
-      {admin && <FormJogador aoCriar={aoMudar} />}
+      {admin &&
+        (criando ? (
+          <div className="mt-4">
+            <FormJogador
+              aoSalvar={() => {
+                setCriando(false);
+                aoMudar();
+              }}
+              aoCancelar={() => setCriando(false)}
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => setCriando(true)}
+            className="border-line text-muted mt-4 rounded border border-dashed px-4 py-2 text-sm"
+          >
+            + Novo jogador
+          </button>
+        ))}
     </section>
   );
 }
 
-function FormJogador({ aoCriar }: { aoCriar: () => void }) {
-  const [apelido, setApelido] = useState("");
-  const [nomeCompleto, setNomeCompleto] = useState("");
-  const [posicao, setPosicao] = useState("");
-  const [tipo, setTipo] = useState<TipoJogador>("linha");
-  const [vinculo, setVinculo] = useState<Vinculo>("suplente");
+function LinhaJogador({
+  jogador: j,
+  admin,
+  temHistorico,
+  aoEditar,
+  aoMudar,
+}: {
+  jogador: Jogador;
+  admin: boolean;
+  temHistorico: boolean;
+  aoEditar: () => void;
+  aoMudar: () => void;
+}) {
+  const [erro, setErro] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+
+  async function executar(acao: () => Promise<void>) {
+    setErro(null);
+    setOcupado(true);
+    try {
+      await acao();
+      aoMudar();
+    } catch (x) {
+      setErro(x instanceof Error ? x.message : String(x));
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <li className="py-3">
+      <div className="flex items-baseline gap-3">
+        <div className="min-w-0 flex-1">
+          <p className={j.ativo ? "font-medium" : "text-muted font-medium"}>
+            {j.apelido}
+            {j.tipo === "goleiro" && (
+              <span className="text-gold ml-2 text-xs uppercase">goleiro</span>
+            )}
+            {!j.ativo && (
+              <span className="text-muted ml-2 text-xs uppercase">inativo</span>
+            )}
+          </p>
+          {(j.nome_completo || j.posicao_preferida) && (
+            <p className="text-muted truncate text-sm">
+              {[j.nome_completo, j.posicao_preferida].filter(Boolean).join(" · ")}
+            </p>
+          )}
+        </div>
+        <span className="text-muted shrink-0 text-xs uppercase">
+          {j.vinculo}
+        </span>
+      </div>
+
+      {admin && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Acao onClick={aoEditar}>Editar</Acao>
+          <Acao
+            onClick={() =>
+              void executar(() => atualizarJogador(j.id, { ativo: !j.ativo }))
+            }
+            disabled={ocupado}
+          >
+            {j.ativo ? "Desativar" : "Reativar"}
+          </Acao>
+
+          {/* Exclusão real só para quem nunca entrou em partida. Com histórico,
+              escalacao aponta para ele e apagar reescreveria o passado. */}
+          {temHistorico ? (
+            <span className="text-muted self-center text-xs">
+              tem histórico — não pode ser excluído
+            </span>
+          ) : confirmando ? (
+            <span className="flex items-center gap-2">
+              <span className="text-alert text-xs">Apagar de vez?</span>
+              <Acao
+                onClick={() => void executar(() => excluirJogador(j.id))}
+                disabled={ocupado}
+                perigo
+              >
+                Sim, excluir
+              </Acao>
+              <Acao onClick={() => setConfirmando(false)}>Não</Acao>
+            </span>
+          ) : (
+            <Acao onClick={() => setConfirmando(true)} perigo>
+              Excluir
+            </Acao>
+          )}
+        </div>
+      )}
+
+      {erro && <Aviso>{erro}</Aviso>}
+    </li>
+  );
+}
+
+function FormJogador({
+  inicial,
+  aoSalvar,
+  aoCancelar,
+}: {
+  inicial?: Jogador;
+  aoSalvar: () => void;
+  aoCancelar: () => void;
+}) {
+  const [apelido, setApelido] = useState(inicial?.apelido ?? "");
+  const [nomeCompleto, setNomeCompleto] = useState(inicial?.nome_completo ?? "");
+  const [posicao, setPosicao] = useState(inicial?.posicao_preferida ?? "");
+  const [tipo, setTipo] = useState<TipoJogador>(inicial?.tipo ?? "linha");
+  const [vinculo, setVinculo] = useState<Vinculo>(inicial?.vinculo ?? "suplente");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -275,21 +485,21 @@ function FormJogador({ aoCriar }: { aoCriar: () => void }) {
     e.preventDefault();
     setErro(null);
     setEnviando(true);
+    const campos = {
+      apelido: apelido.trim(),
+      nome_completo: nomeCompleto.trim() || null,
+      posicao_preferida: posicao.trim() || null,
+      tipo,
+      vinculo,
+    };
     try {
-      await criarJogador({
-        apelido: apelido.trim(),
-        nome_completo: nomeCompleto.trim() || null,
-        posicao_preferida: posicao.trim() || null,
-        tipo,
-        vinculo,
-      });
-      setApelido("");
-      setNomeCompleto("");
-      setPosicao("");
-      aoCriar();
+      if (inicial) await atualizarJogador(inicial.id, campos);
+      else await criarJogador(campos);
+      aoSalvar();
     } catch (x) {
       const m = x instanceof Error ? x.message : String(x);
-      // O apelido é único dentro do horário: é ele que a leitura de súmula procura.
+      // O apelido é único dentro do horário: é por ele que a leitura de
+      // súmula encontra a pessoa.
       setErro(
         /duplicate|unique/i.test(m)
           ? `Já existe um jogador com o apelido "${apelido.trim()}". O apelido precisa ser único.`
@@ -303,9 +513,11 @@ function FormJogador({ aoCriar }: { aoCriar: () => void }) {
   return (
     <form
       onSubmit={enviar}
-      className="border-line bg-surface mt-4 space-y-3 rounded-lg border p-4"
+      className="border-line bg-surface space-y-3 rounded-lg border p-4"
     >
-      <p className="text-muted text-sm">Novo jogador</p>
+      <p className="text-muted text-sm">
+        {inicial ? `Editando ${inicial.apelido}` : "Novo jogador"}
+      </p>
 
       <Texto rotulo="Apelido" valor={apelido} aoMudar={setApelido} />
       <Texto
@@ -338,13 +550,12 @@ function FormJogador({ aoCriar }: { aoCriar: () => void }) {
 
       {erro && <p className="text-alert text-sm">{erro}</p>}
 
-      <button
-        type="submit"
-        disabled={enviando || !apelido.trim()}
-        className="bg-gold text-pitch rounded px-4 py-2 font-semibold disabled:opacity-40"
-      >
-        {enviando ? "Salvando…" : "Criar jogador"}
-      </button>
+      <Botoes
+        enviando={enviando}
+        desabilitado={!apelido.trim()}
+        rotulo={inicial ? "Salvar" : "Criar jogador"}
+        aoCancelar={aoCancelar}
+      />
     </form>
   );
 }
@@ -363,8 +574,60 @@ function Titulo({ children }: { children: React.ReactNode }) {
 
 function Aviso({ children }: { children: React.ReactNode }) {
   return (
-    <div className="border-alert bg-surface text-alert my-3 rounded-lg border p-3 text-sm break-words">
+    <div className="border-alert bg-surface text-alert my-2 rounded-lg border p-3 text-sm break-words">
       {children}
+    </div>
+  );
+}
+
+function Acao({
+  children,
+  onClick,
+  disabled,
+  perigo,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  perigo?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`rounded border px-3 py-1.5 text-sm disabled:opacity-40 ${
+        perigo ? "border-alert text-alert" : "border-line text-muted"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Botoes({
+  enviando,
+  desabilitado,
+  rotulo,
+  aoCancelar,
+}: {
+  enviando: boolean;
+  desabilitado: boolean;
+  rotulo: string;
+  aoCancelar: () => void;
+}) {
+  return (
+    <div className="flex gap-2 pt-1">
+      <button
+        type="submit"
+        disabled={enviando || desabilitado}
+        className="bg-gold text-pitch rounded px-4 py-2 font-semibold disabled:opacity-40"
+      >
+        {enviando ? "Salvando…" : rotulo}
+      </button>
+      <button type="button" onClick={aoCancelar} className="text-muted px-4 py-2">
+        Cancelar
+      </button>
     </div>
   );
 }

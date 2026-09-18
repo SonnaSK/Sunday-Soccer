@@ -99,6 +99,20 @@ export interface FichaPartida {
   margem: number;
 }
 
+/**
+ * Rodada com suas partidas e os uniformes já resolvidos, para a tela de
+ * gerenciamento. Diferente de `FichaPartida`, inclui rodada arquivada —
+ * o administrador precisa enxergar o que arquivou para poder restaurar.
+ */
+export interface RodadaDetalhada {
+  rodada: Rodada;
+  partidas: Array<{
+    partida: Partida;
+    uniforme_casa: Uniforme | null;
+    uniforme_fora: Uniforme | null;
+  }>;
+}
+
 /** O que a tela de lançamento monta e manda para salvar_rodada. */
 export interface RodadaParaSalvar {
   rodada_id?: string; // presente = edição
