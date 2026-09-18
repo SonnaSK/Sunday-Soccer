@@ -1,126 +1,99 @@
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
-import { listarJogadores, listarUniformes } from "./lib/dados";
-import type { Jogador, Uniforme } from "./lib/tipos";
+import { useCallback, useEffect, useState } from "react";
+import { usuarioAtual, ehAdministrador, sair } from "./lib/dados";
+import Elenco from "./paginas/Elenco";
+import Entrar from "./paginas/Entrar";
 
-/**
- * Tela de verificação da corrente inteira — chave, grants, RLS e camada de
- * dados — como sugere o README. Não é a tela de Elenco: é o degrau anterior,
- * para que um erro de configuração apareça aqui e não no meio de uma tela.
- */
-type Estado =
-  | { fase: "carregando" }
-  | { fase: "erro"; mensagem: string }
-  | { fase: "pronto"; jogadores: Jogador[]; uniformes: Uniforme[] };
+type Sessao = {
+  logado: boolean;
+  admin: boolean;
+  email: string | null;
+};
 
 export default function App() {
-  const [estado, setEstado] = useState<Estado>({ fase: "carregando" });
+  const [sessao, setSessao] = useState<Sessao | null>(null);
+  const [mostrarLogin, setMostrarLogin] = useState(false);
 
-  useEffect(() => {
-    Promise.all([listarJogadores(), listarUniformes()])
-      .then(([jogadores, uniformes]) =>
-        setEstado({ fase: "pronto", jogadores, uniformes })
-      )
-      .catch((e: unknown) =>
-        setEstado({
-          fase: "erro",
-          mensagem: e instanceof Error ? e.message : String(e),
-        })
-      );
+  const conferir = useCallback(async () => {
+    const usuario = await usuarioAtual();
+    setSessao({
+      logado: !!usuario,
+      admin: usuario ? await ehAdministrador() : false,
+      email: usuario?.email ?? null,
+    });
   }, []);
 
+  useEffect(() => {
+    void conferir();
+  }, [conferir]);
+
+  const admin = sessao?.admin ?? false;
+
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <header className="mb-8">
-        <h1 className="font-condensed text-4xl font-bold tracking-wide uppercase">
+    <div className="mx-auto max-w-2xl px-4 py-6">
+      <header className="border-line mb-6 flex items-baseline justify-between gap-3 border-b pb-3">
+        <h1 className="font-condensed text-3xl font-bold tracking-wide uppercase">
           Domingo
         </h1>
-        <p className="text-muted text-sm">Verificação de conexão</p>
+
+        {sessao && (
+          <div className="text-right">
+            {sessao.logado ? (
+              <button
+                onClick={async () => {
+                  await sair();
+                  await conferir();
+                }}
+                className="text-muted text-sm underline"
+              >
+                Sair
+              </button>
+            ) : (
+              <button
+                onClick={() => setMostrarLogin((v) => !v)}
+                className="text-muted text-sm underline"
+              >
+                {mostrarLogin ? "Fechar" : "Entrar"}
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
-      {estado.fase === "carregando" && (
-        <p className="text-muted">Consultando o banco…</p>
+      {mostrarLogin && !sessao?.logado && (
+        <div className="mb-6">
+          <Entrar
+            aoEntrar={async () => {
+              setMostrarLogin(false);
+              await conferir();
+            }}
+            aoCancelar={() => setMostrarLogin(false)}
+          />
+        </div>
       )}
 
-      {estado.fase === "erro" && (
-        <div className="border-alert bg-surface rounded-lg border p-4">
-          <p className="text-alert mb-2 font-semibold">A conexão falhou.</p>
-          <p className="text-muted mb-3 text-sm break-words">
-            {estado.mensagem}
+      {/* O erro que o 03-DESENVOLVIMENTO.md avisa: o login funciona, mas
+          sem linha em `administrador` o RLS recusa toda escrita. Sem este
+          aviso o sintoma seria um botão que falha sem explicação. */}
+      {sessao?.logado && !sessao.admin && (
+        <div className="border-alert bg-surface text-alert mb-6 rounded-lg border p-3 text-sm">
+          <p className="mb-1 font-semibold">
+            Você entrou, mas não é administrador deste horário.
           </p>
-          <p className="text-muted text-sm">
-            Confira <code className="text-chalk">.env.local</code>: a chave anon
-            precisa estar preenchida. Depois de editar esse arquivo, o servidor
-            tem que ser reiniciado.
+          <p className="text-muted">
+            Falta registrar {sessao.email} na tabela <code>administrador</code>.
+            O passo está no <code>03-DESENVOLVIMENTO.md</code>, seção Supabase.
+            Até lá, a escrita fica bloqueada pelo RLS.
           </p>
         </div>
       )}
 
-      {estado.fase === "pronto" && (
-        <div className="space-y-8">
-          <p className="text-gold font-semibold">
-            Conexão funcionando. Banco respondendo, RLS liberando leitura.
-          </p>
+      <Elenco admin={admin} />
 
-          <Secao titulo="Jogadores" contagem={estado.jogadores.length}>
-            <ul className="divide-line divide-y">
-              {estado.jogadores.map((j) => (
-                <li key={j.id} className="flex items-baseline gap-3 py-2">
-                  <span className="font-medium">{j.apelido}</span>
-                  <span className="text-muted text-sm">
-                    {j.tipo === "goleiro" ? "goleiro" : j.vinculo}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Secao>
-
-          <Secao titulo="Uniformes" contagem={estado.uniformes.length}>
-            <ul className="divide-line divide-y">
-              {estado.uniformes.map((u) => (
-                <li key={u.id} className="flex items-center gap-3 py-2">
-                  <span
-                    className="border-line inline-block h-5 w-5 shrink-0 rounded-full border"
-                    style={{
-                      background: `linear-gradient(135deg, ${u.cor_primaria} 50%, ${u.cor_secundaria} 50%)`,
-                    }}
-                  />
-                  <span className="font-medium">{u.nome}</span>
-                  <span className="text-muted tabular text-sm">{u.ano}</span>
-                  {!u.ativo && (
-                    <span className="text-muted text-xs uppercase">
-                      aposentado
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </Secao>
-        </div>
+      {sessao && !sessao.logado && (
+        <p className="text-muted mt-10 text-sm">
+          Somente leitura. Entre como administrador para editar.
+        </p>
       )}
-    </main>
-  );
-}
-
-function Secao({
-  titulo,
-  contagem,
-  children,
-}: {
-  titulo: string;
-  contagem: number;
-  children: ReactNode;
-}) {
-  return (
-    <section>
-      <h2 className="font-condensed text-muted mb-1 text-xl tracking-wide uppercase">
-        {titulo} <span className="tabular">({contagem})</span>
-      </h2>
-      {contagem === 0 ? (
-        <p className="text-muted text-sm">Nenhum registro.</p>
-      ) : (
-        children
-      )}
-    </section>
+    </div>
   );
 }
