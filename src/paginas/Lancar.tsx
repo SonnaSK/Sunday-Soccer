@@ -177,6 +177,17 @@ export default function Lancar({
   const deLinha = jogadores.filter((j) => j.tipo === "linha");
   const goleiros = jogadores.filter((j) => j.tipo === "goleiro");
 
+  // Os botões mostram o nome do uniforme escolhido, não "Casa" e "Fora":
+  // é assim que a súmula é escrita e é assim que se pensa em campo.
+  // Enquanto não há uniforme selecionado, sobra o rótulo genérico.
+  const times = [
+    { lado: "C" as Lado, padrao: "Casa", id: uniCasa },
+    { lado: "F" as Lado, padrao: "Fora", id: uniFora },
+  ].map(({ lado, padrao, id }) => {
+    const u = uniformes.find((x) => x.id === id);
+    return { lado, nome: u?.nome ?? padrao, cor: u?.cor_primaria ?? "#7E9189" };
+  });
+
   return (
     <section className="space-y-6">
       <div className="flex items-baseline justify-between gap-3">
@@ -268,6 +279,7 @@ export default function Lancar({
               key={j.id}
               jogador={j}
               linha={escalados[j.id]}
+              times={times}
               aoAlternar={(lado) => alternarLado(j.id, lado)}
               aoSomar={(campo, d) => somar(j.id, campo, d)}
             />
@@ -404,11 +416,13 @@ function CartaoTime({
 function LinhaJogador({
   jogador: j,
   linha,
+  times,
   aoAlternar,
   aoSomar,
 }: {
   jogador: Jogador;
   linha?: Linha;
+  times: Array<{ lado: Lado; nome: string; cor: string }>;
   aoAlternar: (lado: Lado) => void;
   aoSomar: (campo: "gols" | "assistencias", delta: number) => void;
 }) {
@@ -423,17 +437,22 @@ function LinhaJogador({
           {j.apelido}
         </span>
 
-        {(["C", "F"] as const).map((lado) => (
+        {times.map((t) => (
           <button
-            key={lado}
-            onClick={() => aoAlternar(lado)}
-            className={`w-16 rounded border px-2 py-1 text-xs ${
-              linha?.lado === lado
+            key={t.lado}
+            onClick={() => aoAlternar(t.lado)}
+            className={`flex w-20 shrink-0 items-center justify-center gap-1.5 rounded border px-2 py-1.5 text-xs ${
+              linha?.lado === t.lado
                 ? "bg-gold text-pitch border-gold font-semibold"
                 : "border-line text-muted"
             }`}
           >
-            {lado === "C" ? "Casa" : "Fora"}
+            <span
+              aria-hidden
+              className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ background: t.cor }}
+            />
+            <span className="truncate">{t.nome}</span>
           </button>
         ))}
       </div>

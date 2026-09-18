@@ -659,6 +659,16 @@ function Texto({
   );
 }
 
+/**
+ * Cor por seletor OU por código digitado.
+ *
+ * O seletor do sistema é desconfortável no celular e não permite repetir
+ * uma cor exata. O campo de texto resolve os dois casos: dá para colar o
+ * código da camisa e obter sempre o mesmo tom.
+ *
+ * O texto tem estado próprio para que digitar parcialmente não atropele a
+ * cor válida; só sobe quando vira um hex completo.
+ */
 function Cor({
   rotulo,
   valor,
@@ -668,16 +678,40 @@ function Cor({
   valor: string;
   aoMudar: (v: string) => void;
 }) {
+  const [texto, setTexto] = useState(valor);
+
+  useEffect(() => setTexto(valor), [valor]);
+
+  function digitou(v: string) {
+    setTexto(v);
+    const hex = "#" + v.trim().replace(/^#/, "");
+    if (/^#[0-9a-f]{6}$/i.test(hex)) aoMudar(hex.toLowerCase());
+  }
+
   return (
-    <label className="block">
+    <div>
       <span className="text-muted mb-1 block text-sm">{rotulo}</span>
-      <input
-        type="color"
-        value={valor}
-        onChange={(e) => aoMudar(e.target.value)}
-        className="border-line bg-surface2 h-10 w-16 rounded border"
-      />
-    </label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={valor}
+          onChange={(e) => aoMudar(e.target.value)}
+          className="border-line bg-surface2 h-10 w-12 shrink-0 rounded border"
+          aria-label={`${rotulo}: seletor`}
+        />
+        <input
+          type="text"
+          value={texto}
+          onChange={(e) => digitou(e.target.value)}
+          onBlur={() => setTexto(valor)}
+          spellCheck={false}
+          autoCapitalize="none"
+          placeholder="#0B2A6B"
+          aria-label={`${rotulo}: código`}
+          className="bg-surface2 border-line text-chalk tabular w-28 rounded border px-2 py-2 font-mono text-sm"
+        />
+      </div>
+    </div>
   );
 }
 
