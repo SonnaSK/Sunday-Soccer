@@ -38,12 +38,27 @@ export async function usuarioAtual() {
   return data.user ?? null;
 }
 
-/** Só quem está em administrador pode escrever. Use para mostrar/esconder telas. */
+/**
+ * Administrador DESTE horário. Use para mostrar/esconder controles.
+ *
+ * O filtro por horario_id espelha `eh_admin(h)` no banco, que confere
+ * `horario_id = h and user_id = auth.uid()`. Sem ele, quem administrasse
+ * outro horário veria os botões de editar e excluir aqui e só descobriria
+ * a recusa ao clicar. Na v1 há um horário só e os dois dão o mesmo
+ * resultado; a diferença aparece quando houver mais de um, que é
+ * justamente o motivo de horario_id existir em todas as tabelas.
+ *
+ * Isto é conveniência de interface, não a trava: quem garante é o RLS.
+ */
 export async function ehAdministrador(): Promise<boolean> {
   const user = await usuarioAtual();
   if (!user) return false;
   const { data, error } = await supabase
-    .from("administrador").select("papel").eq("user_id", user.id).limit(1);
+    .from("administrador")
+    .select("papel")
+    .eq("user_id", user.id)
+    .eq("horario_id", await horarioAtual())
+    .limit(1);
   if (error) return false;
   return (data?.length ?? 0) > 0;
 }
